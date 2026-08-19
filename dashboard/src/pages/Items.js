@@ -1,5 +1,31 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axiosConfig";
+import { Icon } from "../components/Icons";
+import {
+  PageHeader,
+  FilterBar,
+  StatusPill,
+  SortableTh,
+  TableFooter,
+  EmptyState,
+  useTableControls,
+} from "../components/ui";
+
+// Standard units of measure available when creating/editing an item.
+// Keep this list in sync with anywhere else UOM is referenced (e.g.
+// the mobile app's order screen).
+const UNIT_OPTIONS = [
+  "PCS",
+  "CTN",
+  "KG",
+  "G",
+  "L",
+  "ML",
+  "BOX",
+  "PACK",
+  "DOZEN",
+  "BAG"
+];
 
 function Items() {
   const [items, setItems] = useState([]);
@@ -13,6 +39,7 @@ function Items() {
     item_code: "",
     name: "",
     category: "",
+    unit: "PCS",
     price: "",
     stock: "",
     status: "Active"
@@ -96,6 +123,7 @@ function Items() {
       item_code: item.item_code || "",
       name: item.name || "",
       category: item.category || "",
+      unit: item.unit || "PCS",
       price: item.price || "",
       stock: item.stock || "",
       status: item.status || "Active"
@@ -122,6 +150,7 @@ function Items() {
       item_code: "",
       name: "",
       category: "",
+      unit: "PCS",
       price: "",
       stock: "",
       status: "Active"
@@ -131,95 +160,111 @@ function Items() {
     setShowForm(false);
   };
 
-  // ================= STATUS BADGE =================
-  const getStatusBadge = (status) => {
-    return status === "Active" ? (
-      <span className="badge bg-success">Active</span>
-    ) : (
-      <span className="badge bg-secondary">Inactive</span>
-    );
-  };
-
   // ================= UI =================
+  const tc = useTableControls(items, {
+    searchKeys: ["item_code", "name", "category", "unit"],
+  });
+
   return (
     <div>
 
-      {/* HEADER */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>Items Master</h3>
+      <PageHeader
+        title="Items Master"
+        subtitle={`${items.length} items in catalogue`}
+        actions={
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setShowForm(true);
+              setEditing(null);
+            }}
+          >
+            <Icon.Plus size={14} /> Add Item
+          </button>
+        }
+      />
 
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setShowForm(true);
-            setEditing(null);
-          }}
-        >
-          + Add Item
-        </button>
-      </div>
+      {message && <div className="alert alert-info">{message}</div>}
 
-      {/* MESSAGE */}
-      {message && (
-        <div className="alert alert-info">
-          {message}
-        </div>
-      )}
+      <FilterBar
+        searchValue={tc.search}
+        onSearchChange={tc.setSearch}
+        placeholder="Search item code, name, category..."
+        onAddFilter={() => showMessage("Custom filters coming soon")}
+        onRefresh={fetchItems}
+      />
 
       {/* TABLE */}
-      <div className="card shadow-sm p-3">
+      <div className="card p-0">
+        <div className="table-wrap">
+          {loading ? (
+            <p className="p-4 mb-0">Loading...</p>
+          ) : (
+            <table className="table table-hover align-middle">
 
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table className="table table-hover align-middle">
-
-            <thead className="table-dark">
-              <tr>
-                <th>ID</th>
-                <th>Item Code</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{item.item_code}</td>
-                  <td>{item.name}</td>
-                  <td>{item.category}</td>
-                  <td>{item.price}</td>
-                  <td>{item.stock}</td>
-                  <td>{getStatusBadge(item.status)}</td>
-
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline-secondary me-2"
-                      onClick={() => handleEdit(item)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+              <thead>
+                <tr>
+                  <SortableTh label="Item Code" sortKey="item_code" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <SortableTh label="Name" sortKey="name" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <th>Category</th>
+                  <th>UOM</th>
+                  <SortableTh label="Price" sortKey="price" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <SortableTh label="Stock" sortKey="stock" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
 
-          </table>
-        )}
+              <tbody>
+                {tc.pageRows.length === 0 ? (
+                  <tr><td colSpan="8"><EmptyState label="No items found." /></td></tr>
+                ) : (
+                  tc.pageRows.map((item) => (
+                    <tr key={item.id}>
+                      <td className="fw-semibold">{item.item_code}</td>
+                      <td>{item.name}</td>
+                      <td>{item.category}</td>
+                      <td>{item.unit || "—"}</td>
+                      <td>{item.price}</td>
+                      <td>{item.stock}</td>
+                      <td><StatusPill status={item.status || "Active"} /></td>
 
+                      <td>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => handleEdit(item)}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+
+            </table>
+          )}
+        </div>
+
+        <div className="px-3 pb-2">
+          <TableFooter
+            rowsPerPage={tc.rowsPerPage}
+            onRowsPerPageChange={tc.setRowsPerPage}
+            totalRows={tc.totalRows}
+            page={tc.page}
+            totalPages={tc.totalPages}
+            onPageChange={tc.setPage}
+          />
+        </div>
       </div>
 
       {/* FORM */}
@@ -250,6 +295,20 @@ function Items() {
             value={formData.category}
             onChange={handleChange}
           />
+
+          <label className="form-label mb-1">Unit of Measure (UOM)</label>
+          <select
+            name="unit"
+            className="form-control mb-2"
+            value={formData.unit}
+            onChange={handleChange}
+          >
+            {UNIT_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
           <input
             name="price"

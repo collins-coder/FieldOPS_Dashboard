@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function PriceLists() {
   const [data, setData] = useState([]);
@@ -19,7 +20,7 @@ function PriceLists() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/price-lists");
+      const res = await api.get(`${MASTERS_BASE}/price-lists`);
       setData(res.data || []);
     } catch (err) {
       console.log(err);
@@ -42,12 +43,12 @@ function PriceLists() {
     if (!form.code || !form.name) return;
 
     if (editing) {
-      await axios.put(
-        `http://localhost:5000/api/price-lists/${editing.id}`,
+      await api.put(
+        `${MASTERS_BASE}/price-lists/${editing.id}`,
         form
       );
     } else {
-      await axios.post("http://localhost:5000/api/price-lists", form);
+      await api.post(`${MASTERS_BASE}/price-lists`, form);
     }
 
     resetForm();
@@ -65,7 +66,7 @@ function PriceLists() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this price list?")) return;
 
-    await axios.delete(`http://localhost:5000/api/price-lists/${id}`);
+    await api.delete(`${MASTERS_BASE}/price-lists/${id}`);
     fetchData();
   };
 
@@ -114,7 +115,7 @@ function PriceLists() {
         ) : (
           <table className="table table-hover align-middle">
 
-            <thead className="table-dark">
+            <thead >
               <tr>
                 <th>Code</th>
                 <th>Name</th>

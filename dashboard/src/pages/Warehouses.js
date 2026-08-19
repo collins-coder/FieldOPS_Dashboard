@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function Warehouses() {
   const [data, setData] = useState([]);
@@ -23,7 +24,7 @@ function Warehouses() {
     setLoading(true);
 
     try {
-      const res = await axios.get("http://localhost:5000/api/warehouses");
+      const res = await api.get(`${MASTERS_BASE}/warehouses`);
       setData(res.data || []);
     } catch (err) {
       console.log(err);
@@ -49,13 +50,13 @@ function Warehouses() {
     if (!form.code || !form.name) return;
 
     if (editing) {
-      await axios.put(
-        `http://localhost:5000/api/warehouses/${editing.id}`,
+      await api.put(
+        `${MASTERS_BASE}/warehouses/${editing.id}`,
         form
       );
     } else {
-      await axios.post(
-        "http://localhost:5000/api/warehouses",
+      await api.post(
+        `${MASTERS_BASE}/warehouses`,
         form
       );
     }
@@ -75,7 +76,7 @@ function Warehouses() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this warehouse?")) return;
 
-    await axios.delete(`http://localhost:5000/api/warehouses/${id}`);
+    await api.delete(`${MASTERS_BASE}/warehouses/${id}`);
     fetchData();
   };
 
@@ -130,7 +131,7 @@ function Warehouses() {
         ) : (
           <table className="table table-hover align-middle">
 
-            <thead className="table-dark">
+            <thead >
               <tr>
                 <th>Code</th>
                 <th>Name</th>

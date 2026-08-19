@@ -1,23 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-
-// =====================================================
-// AXIOS INSTANCE (INTERCEPTOR)
-// =====================================================
-const api = axios.create({
-  baseURL: "http://127.0.0.1:5000"
-});
-
-// Attach token automatically
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
+// Was creating its own separate axios instance/interceptor here — now
+// uses the same shared client as every other page, so there's one
+// source of truth for base URL + auth handling.
+import api from "../api/axiosConfig";
 
 function SystemLogs() {
   const [logs, setLogs] = useState([]);
@@ -155,7 +140,7 @@ function SystemLogs() {
           <div className="table-responsive">
 
             <table className="table table-hover table-sm">
-              <thead className="table-dark">
+              <thead >
                 <tr>
                   <th>ID</th>
                   <th>Action</th>

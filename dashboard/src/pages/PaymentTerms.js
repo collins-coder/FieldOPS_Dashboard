@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function PaymentTerms() {
   const [data, setData] = useState([]);
@@ -19,7 +20,7 @@ function PaymentTerms() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/payment-terms");
+      const res = await api.get(`${MASTERS_BASE}/payment-terms`);
       setData(res.data || []);
     } catch (err) {
       console.log("FETCH ERROR:", err.response?.data || err.message);
@@ -50,13 +51,13 @@ function PaymentTerms() {
       };
 
       if (editing) {
-        await axios.put(
-          `http://localhost:5000/api/payment-terms/${editing.id}`,
+        await api.put(
+          `${MASTERS_BASE}/payment-terms/${editing.id}`,
           payload
         );
       } else {
-        await axios.post(
-          "http://localhost:5000/api/payment-terms",
+        await api.post(
+          `${MASTERS_BASE}/payment-terms`,
           payload
         );
       }
@@ -84,8 +85,8 @@ function PaymentTerms() {
   // ================= DELETE =================
   const remove = async (id) => {
     try {
-      await axios.delete(
-        `http://localhost:5000/api/payment-terms/${id}`
+      await api.delete(
+        `${MASTERS_BASE}/payment-terms/${id}`
       );
       fetchData();
     } catch (err) {
@@ -132,7 +133,7 @@ function PaymentTerms() {
         ) : (
           <table className="table table-hover">
 
-            <thead className="table-dark">
+            <thead >
               <tr>
                 <th>Code</th>
                 <th>Name</th>

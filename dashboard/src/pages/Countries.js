@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function Countries() {
   const [data, setData] = useState([]);
@@ -19,7 +20,7 @@ function Countries() {
     setLoading(true);
 
     try {
-      const res = await axios.get("http://localhost:5000/api/countries");
+      const res = await api.get(`${MASTERS_BASE}/countries`);
       setData(res.data || []);
     } catch (err) {
       console.log(err);
@@ -45,13 +46,13 @@ function Countries() {
     if (!form.code || !form.name) return;
 
     if (editing) {
-      await axios.put(
-        `http://localhost:5000/api/countries/${editing.id}`,
+      await api.put(
+        `${MASTERS_BASE}/countries/${editing.id}`,
         form
       );
     } else {
-      await axios.post(
-        "http://localhost:5000/api/countries",
+      await api.post(
+        `${MASTERS_BASE}/countries`,
         form
       );
     }
@@ -71,7 +72,7 @@ function Countries() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this country?")) return;
 
-    await axios.delete(`http://localhost:5000/api/countries/${id}`);
+    await api.delete(`${MASTERS_BASE}/countries/${id}`);
     fetchData();
   };
 
@@ -118,7 +119,7 @@ function Countries() {
         ) : (
           <table className="table table-hover align-middle">
 
-            <thead className="table-dark">
+            <thead >
               <tr>
                 <th>Code</th>
                 <th>Name</th>

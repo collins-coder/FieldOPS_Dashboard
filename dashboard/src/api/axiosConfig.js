@@ -36,4 +36,20 @@ api.interceptors.response.use(
   }
 );
 
+// Many Express/Flask APIs wrap list responses like
+// { success: true, data: [...] } or { results: [...] } instead of
+// returning a bare array. If a page reads `res.data` and gets an object
+// instead of an array, `.length`/`.map()` on it either crashes or silently
+// shows nothing — which looks exactly like "the dashboard can't read data
+// that's in the database" even though the request actually succeeded.
+// Use this instead of `res.data || []` wherever a list is expected.
+export function unwrapList(resData) {
+  if (Array.isArray(resData)) return resData;
+  if (!resData || typeof resData !== "object") return [];
+  for (const key of ["data", "results", "records", "items", "customers", "orders", "invoices", "payments", "deliveries"]) {
+    if (Array.isArray(resData[key])) return resData[key];
+  }
+  return [];
+}
+
 export default api;

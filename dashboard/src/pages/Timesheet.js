@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axiosConfig";
+import { Icon } from "../components/Icons";
+import { PageHeader, StatusPill } from "../components/ui";
 
 function Timesheet() {
   const [records, setRecords] = useState([]);
@@ -54,28 +56,17 @@ function Timesheet() {
     }
   };
 
-  // ================= STATUS =================
-  const getStatusBadge = (status) => {
-    if (status === "Completed") {
-      return <span className="badge bg-success">Completed</span>;
-    }
-    if (status === "Active") {
-      return <span className="badge bg-warning text-dark">Active</span>;
-    }
-    return <span className="badge bg-secondary">{status}</span>;
-  };
-
   return (
     <div>
 
-      {/* HEADER */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>Timesheet - Employee Timesheet</h3>
-      </div>
+      <PageHeader
+        title="Timesheet"
+        subtitle="Start/stop day sessions logged from the field app. A session left open is auto-closed at midnight (Phase C)."
+      />
 
       {/* FILTERS */}
       <div className="card p-3 mb-3">
-        <div className="row align-items-end">
+        <div className="row align-items-end g-2">
 
           <div className="col-md-3">
             <label>Start Date</label>
@@ -97,13 +88,13 @@ function Timesheet() {
             />
           </div>
 
-          <div className="col-md-3 d-flex gap-2">
-            <button className="btn btn-primary mt-4" onClick={fetchTimesheet}>
-              Filter
+          <div className="col-md-6 d-flex gap-2">
+            <button className="btn btn-primary" onClick={fetchTimesheet}>
+              <Icon.Filter size={14} /> Filter
             </button>
 
-            <button className="btn btn-success mt-4" onClick={exportExcel}>
-              Export to Excel
+            <button className="btn btn-light" onClick={exportExcel}>
+              <Icon.FileText size={14} /> Export to Excel
             </button>
           </div>
 
@@ -111,42 +102,46 @@ function Timesheet() {
       </div>
 
       {/* TABLE */}
-      <div className="card shadow-sm p-3">
+      <div className="card p-0">
+        <div className="table-wrap">
+          {loading ? (
+            <p className="p-4 mb-0">Loading timesheet...</p>
+          ) : (
+            <table className="table table-hover align-middle">
 
-        {loading ? (
-          <p>Loading timesheet...</p>
-        ) : (
-
-          <table className="table table-hover align-middle">
-
-            <thead className="table-dark">
-              <tr>
-                <th>User</th>
-                <th>Date</th>
-                <th>In Time</th>
-                <th>Out Time</th>
-                <th>Status</th>
-                <th>Logged Hours</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {records.map((r, index) => (
-                <tr key={index}>
-                  <td>{r.user}</td>
-                  <td>{r.date}</td>
-                  <td>{r.start_time || r.in_time}</td>
-                  <td>{r.end_time || "N/A"}</td>
-                  <td>{getStatusBadge(r.status)}</td>
-                  <td>{r.logged_hours || "-"}</td>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Date</th>
+                  <th>In Time</th>
+                  <th>Out Time</th>
+                  <th>Status</th>
+                  <th>Logged Hours</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
 
-          </table>
+              <tbody>
+                {records.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="table-empty">No timesheet records for this range.</td>
+                  </tr>
+                ) : (
+                  records.map((r, index) => (
+                    <tr key={index}>
+                      <td>{r.user}</td>
+                      <td>{r.date}</td>
+                      <td>{r.start_time || r.in_time}</td>
+                      <td>{r.end_time || "N/A"}</td>
+                      <td><StatusPill status={r.status} /></td>
+                      <td>{r.logged_hours || "-"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
 
-        )}
-
+            </table>
+          )}
+        </div>
       </div>
 
     </div>

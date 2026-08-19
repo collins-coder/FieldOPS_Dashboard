@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function Currency() {
   const [data, setData] = useState([]);
@@ -19,7 +20,7 @@ function Currency() {
     setLoading(true);
 
     try {
-      const res = await axios.get("http://localhost:5000/api/currencies");
+      const res = await api.get(`${MASTERS_BASE}/currencies`);
 
       console.log("RAW:", res.data);
 
@@ -63,13 +64,13 @@ function Currency() {
     if (!form.code || !form.name) return;
 
     if (editing) {
-      await axios.put(
-        `http://localhost:5000/api/currencies/${editing.id}`,
+      await api.put(
+        `${MASTERS_BASE}/currencies/${editing.id}`,
         form
       );
     } else {
-      await axios.post(
-        "http://localhost:5000/api/currencies",
+      await api.post(
+        `${MASTERS_BASE}/currencies`,
         form
       );
     }
@@ -87,7 +88,7 @@ function Currency() {
 
   // ================= DELETE =================
   const handleDelete = async (id) => {
-    await axios.delete(`http://localhost:5000/api/currencies/${id}`);
+    await api.delete(`${MASTERS_BASE}/currencies/${id}`);
     fetchData();
   };
 
@@ -127,7 +128,7 @@ function Currency() {
         ) : (
           <table className="table table-hover">
 
-            <thead className="table-dark">
+            <thead >
               <tr>
                 <th>Code</th>
                 <th>Name</th>

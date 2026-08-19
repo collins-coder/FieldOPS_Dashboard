@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "./theme.css";
 
 function Login({ setToken }) {
   const [username, setUsername] = useState("");
@@ -20,7 +21,6 @@ function Login({ setToken }) {
 
       const { access_token, role, username: uname } = response.data;
 
-      // ✅ FIXED: correct variable (response, not res)
       localStorage.setItem("token", access_token);
       localStorage.setItem("role", role.toLowerCase());
       localStorage.setItem("username", uname);
@@ -46,14 +46,27 @@ function Login({ setToken }) {
     <div
       className="d-flex justify-content-center align-items-center vh-100"
       style={{
-        background: "linear-gradient(135deg, #0d6efd, #0a58ca)"
+        background: "radial-gradient(circle at 20% 20%, #2b2470, #171432 60%)",
       }}
     >
-      <div className="card shadow-lg p-4" style={{ width: "380px", borderRadius: "12px" }}>
-        
-        <h3 className="text-center mb-4 fw-bold text-primary">
-          FieldOPS Login
-        </h3>
+      <div
+        className="card p-4"
+        style={{ width: "400px", borderRadius: "16px", border: "none", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}
+      >
+
+        {/* LOGO */}
+        <div className="d-flex flex-column align-items-center mb-3">
+          <img
+          src={require("./logo.jpeg")}
+          alt="Logo"
+          style={{ width: 84, height: 84, borderRadius: 8, marginBottom: 8 }}
+        />  
+
+          <h3 className="text-center mb-0 fw-bold" style={{ color: "var(--text-primary)" }}>
+            FieldOPS
+          </h3>
+          <small style={{ color: "var(--text-muted)" }}>Sales Force Automation System</small>
+        </div>
 
         <div className="mb-3">
           <label className="form-label">Username</label>
@@ -100,6 +113,10 @@ function Login({ setToken }) {
         >
           {loading ? "Logging in..." : "Login"}
         </button>
+
+        <p className="text-center mt-3 mb-0" style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          © {new Date().getFullYear()} Goandroy. All rights reserved.
+        </p>
       </div>
     </div>
   );

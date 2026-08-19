@@ -8,6 +8,7 @@ import {
 
 import Login from "./Login";
 import Sidebar from "./components/Sidebar";
+import { Icon } from "./components/Icons";
 
 /* DASHBOARD */
 import DashboardHome from "./pages/DashboardHome";
@@ -37,10 +38,12 @@ import Countries from "./pages/Countries";
 
 /* ADMIN */
 import Users from "./pages/Users";
-
+import UserDetails from "./pages/UserDetails";
 /* REPORTS / LOGS */
 import Reports from "./pages/Reports";
 import SystemLogs from "./pages/SystemLogs";
+import GeneralSettings from "./pages/GeneralSettings";
+import HelpCenter from "./pages/HelpCenter";
 
 import "bootstrap/dist/css/bootstrap.min.css";
 
@@ -63,6 +66,7 @@ function Protected({ allowed, children }) {
 /* ================= APP ================= */
 function App() {
   const [token, setToken] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("token");
@@ -85,135 +89,71 @@ function App() {
   return (
     <Router>
 
-      <div
-        style={{
-          display: "flex",
-          background: "#f1f5f9"
-        }}
-      >
+      <div className="app-shell">
 
         {/* SIDEBAR */}
-        <Sidebar />
+        <Sidebar collapsed={sidebarCollapsed} />
 
         {/* MAIN CONTENT */}
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            minHeight: "100vh"
-          }}
-        >
+        <div className="app-main">
 
           {/* TOP NAVBAR */}
-          <div
-            style={{
-              height: "75px",
-              background: "#ffffff",
-              borderBottom: "1px solid #e2e8f0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0 30px",
-              position: "sticky",
-              top: 0,
-              zIndex: 1000
-            }}
-          >
+          <div className="topbar">
+
+            {/* LEFT: collapse toggle + workspace */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                className="topbar-btn"
+                onClick={() => setSidebarCollapsed((v) => !v)}
+                title="Toggle sidebar"
+              >
+                <Icon.PanelLeft size={17} />
+              </div>
+
+              <div className="workspace-pill">
+                <Icon.Building size={15} />
+                Head Office
+                <Icon.ChevronDown size={13} />
+              </div>
+            </div>
 
             {/* SEARCH */}
-            <div
-              style={{
-                width: "320px"
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Search customers, invoices..."
-                className="form-control"
-                style={{
-                  borderRadius: "12px",
-                  border: "1px solid #cbd5e1",
-                  padding: "10px 15px"
-                }}
-              />
+            <div className="topbar-search">
+              <Icon.Search size={15} />
+              <input type="text" placeholder="Search customers, orders, invoices..." />
+              <span className="kbd-hint">⌘K</span>
             </div>
 
             {/* RIGHT SIDE */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "20px"
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
 
-              {/* NOTIFICATION */}
-              <div
-                style={{
-                  fontSize: "20px",
-                  cursor: "pointer"
-                }}
-              >
-                🔔
+              <div className="topbar-icon-btn" title="Notifications">
+                <Icon.Bell size={18} />
+                <span className="notif-dot" />
               </div>
 
-              {/* USER */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px"
-                }}
-              >
+              <div className="topbar-icon-btn" title="Toggle theme">
+                <Icon.Sun size={18} />
+              </div>
 
-                <div
-                  style={{
-                    width: "42px",
-                    height: "42px",
-                    borderRadius: "50%",
-                    background: "#2563eb",
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "700"
-                  }}
-                >
-                  {username?.charAt(0).toUpperCase()}
-                </div>
+              <div className="topbar-icon-btn" title="Settings">
+                <Icon.Settings size={18} />
+              </div>
 
+              <div style={{ width: "1px", height: "26px", background: "var(--border)", margin: "0 6px" }} />
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div className="avatar-circle">{username?.charAt(0).toUpperCase()}</div>
                 <div>
-                  <div
-                    style={{
-                      fontWeight: "600",
-                      color: "#0f172a"
-                    }}
-                  >
+                  <div style={{ fontWeight: 600, fontSize: "13.5px", color: "var(--text-primary)" }}>
                     {username}
                   </div>
-
-                  <small
-                    style={{
-                      color: "#64748b"
-                    }}
-                  >
-                    {role}
-                  </small>
+                  <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>{role}</small>
                 </div>
-
               </div>
 
-              {/* LOGOUT */}
-              <button
-                className="btn btn-danger"
-                style={{
-                  borderRadius: "10px",
-                  padding: "10px 18px"
-                }}
-                onClick={handleLogout}
-              >
-                Logout
+              <button className="btn btn-danger btn-sm" style={{ marginLeft: "10px" }} onClick={handleLogout}>
+                <Icon.LogOut size={14} /> Logout
               </button>
 
             </div>
@@ -221,11 +161,7 @@ function App() {
           </div>
 
           {/* PAGE CONTENT */}
-          <div
-            style={{
-              padding: "25px"
-            }}
-          >
+          <div className="app-content">
 
             <Routes>
 
@@ -273,6 +209,15 @@ function App() {
                 }
               />
 
+              <Route
+    path="/users/:id"
+    element={
+        <Protected allowed={["admin", "developer"]}>
+            <UserDetails />
+        </Protected>
+    }
+/>
+
               {/* REPORTS */}
               <Route path="/reports" element={<Reports />} />
 
@@ -285,6 +230,10 @@ function App() {
                   </Protected>
                 }
               />
+
+              {/* SETTINGS & HELP */}
+              <Route path="/settings" element={<GeneralSettings />} />
+              <Route path="/help" element={<HelpCenter />} />
 
               {/* FALLBACK */}
               <Route path="*" element={<Navigate to="/" replace />} />

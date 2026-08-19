@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosConfig";
+import { MASTERS_BASE } from "../api/mastersBase";
 
 function RoutesPage() {
   const [data, setData] = useState([]);
@@ -8,7 +9,6 @@ function RoutesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const API = "http://localhost:5000/api";
 
   const [form, setForm] = useState({
     route_name: "",
@@ -20,7 +20,7 @@ function RoutesPage() {
   // ================= FETCH ROUTES =================
   const fetchData = async () => {
     try {
-      const res = await axios.get(`${API}/routes`);
+      const res = await api.get(`${MASTERS_BASE}/routes`);
       setData(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.log("ROUTES FETCH ERROR:", err.message);
@@ -31,7 +31,7 @@ function RoutesPage() {
   // ================= FETCH REGIONS =================
   const fetchRegions = async () => {
     try {
-      const res = await axios.get(`${API}/regions`);
+      const res = await api.get(`${MASTERS_BASE}/regions`);
       setRegions(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setRegions([]);
@@ -41,7 +41,7 @@ function RoutesPage() {
   // ================= FETCH COUNTRIES =================
   const fetchCountries = async () => {
     try {
-      const res = await axios.get(`${API}/countries`);
+      const res = await api.get(`${MASTERS_BASE}/countries`);
       setCountries(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setCountries([]);
@@ -65,9 +65,9 @@ function RoutesPage() {
 
     try {
       if (editing) {
-        await axios.put(`${API}/routes/${editing.id}`, form);
+        await api.put(`${MASTERS_BASE}/routes/${editing.id}`, form);
       } else {
-        await axios.post(`${API}/routes`, form);
+        await api.post(`${MASTERS_BASE}/routes`, form);
       }
 
       reset();
@@ -92,7 +92,7 @@ function RoutesPage() {
   // ================= DELETE =================
   const remove = async (id) => {
     try {
-      await axios.delete(`${API}/routes/${id}`);
+      await api.delete(`${MASTERS_BASE}/routes/${id}`);
       fetchData();
     } catch (err) {
       console.log("DELETE ERROR:", err.message);
@@ -126,7 +126,7 @@ function RoutesPage() {
 
         <table className="table table-hover align-middle">
 
-          <thead className="table-dark">
+          <thead >
             <tr>
               <th>Route</th>
               <th>Region</th>

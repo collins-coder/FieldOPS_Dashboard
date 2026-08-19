@@ -1,271 +1,171 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { Icon } from "./Icons";
+import logo from "../logo.jpeg"; // adjust path if needed
 
-function Sidebar() {
+function Sidebar({ collapsed, onNavigate }) {
   const location = useLocation();
   const role = localStorage.getItem("role");
+  const username = localStorage.getItem("username") || "User";
+
+  const isAdmin = ["admin", "developer"].includes(role);
+  const isAnalyst = ["admin", "developer", "supervisor"].includes(role);
 
   const [open, setOpen] = useState({
     sales: true,
-    ops: false,
+    ops: true,
     masters: false,
-    admin: false,
-    analytics: false
+    tripsRoutes: false,
+    iam: false,
+    other: false,
   });
 
-  const toggle = (key) => {
-    setOpen({ ...open, [key]: !open[key] });
-  };
+  const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
 
-  const isActive = (path) => {
-    if (path === "/") {
-      return location.pathname === "/";
-    }
+  const isActive = (path) =>
+    path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
-    return location.pathname.startsWith(path);
-  };
+  const NavLink = ({ to, icon, children }) => (
+    <Link to={to} className={`sidebar-link ${isActive(to) ? "active" : ""}`} onClick={onNavigate}>
+      <span className="icon">{icon}</span>
+      {!collapsed && <span>{children}</span>}
+    </Link>
+  );
 
-  const linkStyle = (path) => ({
-    display: "flex",
-    alignItems: "center",
-    padding: "11px 14px",
-    marginBottom: "6px",
-    borderRadius: "10px",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: isActive(path) ? "#ffffff" : "#cbd5e1",
-    background: isActive(path) ? "#2563eb" : "transparent",
-    transition: "0.3s"
-  });
-
-  const sectionTitle = {
-    marginTop: "18px",
-    marginBottom: "10px",
-    cursor: "pointer",
-    color: "#94a3b8",
-    fontWeight: "700",
-    fontSize: "12px",
-    letterSpacing: "1px"
-  };
+  const GroupToggle = ({ id, icon, label }) => (
+    <div className="sidebar-group-toggle" onClick={() => toggle(id)}>
+      <span className="left">
+        <span className="icon">{icon}</span>
+        {!collapsed && <span>{label}</span>}
+      </span>
+      {!collapsed && (
+        <span className="icon">
+          {open[id] ? <Icon.ChevronDown size={14} /> : <Icon.ChevronRight size={14} />}
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <div
-      style={{
-        width: "280px",
-        background: "#0f172a",
-        color: "white",
-        minHeight: "100vh",
-        padding: "22px",
-        display: "flex",
-        flexDirection: "column",
-        borderRight: "1px solid #1e293b"
-      }}
-    >
+    <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      <div className="sidebar-inner scroll-thin">
 
-      {/* LOGO */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          marginBottom: "25px"
-        }}
-      >
-        <div
-          style={{
-            width: "38px",
-            height: "38px",
-            borderRadius: "10px",
-            background: "linear-gradient(135deg,#2563eb,#06b6d4)"
-          }}
-        />
-
-        <div>
-          <h3
-            style={{
-              margin: 0,
-              fontWeight: "700",
-              fontSize: "24px"
-            }}
-          >
-            FieldOPS
-          </h3>
-
-          <small style={{ color: "#94a3b8" }}>
-            Enterprise Platform
-          </small>
-        </div>
-      </div>
-
-      {/* USER */}
-      <div
-        style={{
-          background: "#111827",
-          padding: "14px",
-          borderRadius: "12px",
-          marginBottom: "20px"
-        }}
-      >
-        <div style={{ fontWeight: "600" }}>
-          {role?.toUpperCase()}
-        </div>
-
-        <small style={{ color: "#94a3b8" }}>
-          Active Session
-        </small>
-      </div>
-
-      {/* MAIN LINKS */}
-      <Link to="/" style={linkStyle("/")}>
-        Dashboard
-      </Link>
-
-      <Link to="/customers" style={linkStyle("/customers")}>
-        Customers
-      </Link>
-
-      {/* SALES */}
-      <div onClick={() => toggle("sales")} style={sectionTitle}>
-        SALES MANAGEMENT
-      </div>
-
-      {open.sales && (
-        <div style={{ marginLeft: "5px" }}>
-          <Link to="/items" style={linkStyle("/items")}>
-            Items
-          </Link>
-
-          <Link to="/sales-orders" style={linkStyle("/sales-orders")}>
-            Sales Orders
-          </Link>
-
-          <Link to="/deliveries" style={linkStyle("/deliveries")}>
-            Deliveries
-          </Link>
-
-          <Link to="/invoices" style={linkStyle("/invoices")}>
-            Invoices
-          </Link>
-
-          <Link to="/payments" style={linkStyle("/payments")}>
-            Payments
-          </Link>
-        </div>
-      )}
-
-      {/* OPERATIONS */}
-      <div onClick={() => toggle("ops")} style={sectionTitle}>
-        FIELD OPERATIONS
-      </div>
-
-      {open.ops && (
-        <div style={{ marginLeft: "5px" }}>
-          <Link to="/timesheet" style={linkStyle("/timesheet")}>
-            Timesheet
-          </Link>
-
-          <Link to="/trips" style={linkStyle("/trips")}>
-            Trips
-          </Link>
-
-          <Link to="/visits" style={linkStyle("/visits")}>
-            Visits
-          </Link>
-        </div>
-      )}
-
-      {/* MASTERS */}
-      {["admin", "developer"].includes(role) && (
-        <>
-          <div onClick={() => toggle("masters")} style={sectionTitle}>
-            MASTER DATA
+        {/* LOGO */}
+        <div className="sidebar-logo">
+          <div className="sidebar-logo-mark" style={{ background: "transparent", padding: 0 }}>
+            <img
+              src={logo}
+              alt="Immortrix Logo"
+              style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }}
+            />
           </div>
-
-          {open.masters && (
-            <div style={{ marginLeft: "5px" }}>
-              <Link to="/price-lists" style={linkStyle("/price-lists")}>
-                Price Lists
-              </Link>
-
-              <Link to="/taxes" style={linkStyle("/taxes")}>
-                Taxes
-              </Link>
-
-              <Link to="/currency" style={linkStyle("/currency")}>
-                Currency
-              </Link>
-
-              <Link to="/payment-terms" style={linkStyle("/payment-terms")}>
-                Payment Terms
-              </Link>
-
-              <Link to="/warehouses" style={linkStyle("/warehouses")}>
-                Warehouses
-              </Link>
-
-              <Link to="/countries" style={linkStyle("/countries")}>
-                Countries
-              </Link>
-
-              <Link to="/regions" style={linkStyle("/regions")}>
-                Regions
-              </Link>
-
-              <Link to="/routes" style={linkStyle("/routes")}>
-                Routes
-              </Link>
+          {!collapsed && (
+            <div className="sidebar-logo-text">
+              <h1>Immortrix</h1>
+              <small>Field Sales Platform</small>
             </div>
           )}
-        </>
-      )}
+        </div>
 
-      {/* ADMIN */}
-      {["admin", "developer"].includes(role) && (
-        <>
-          <div onClick={() => toggle("admin")} style={sectionTitle}>
-            ADMINISTRATION
+        {/* GENERAL */}
+        {!collapsed && <div className="sidebar-section-label">General</div>}
+        <NavLink to="/" icon={<Icon.Dashboard size={17} />}>Dashboard</NavLink>
+        <NavLink to="/customers" icon={<Icon.Building size={17} />}>Customers</NavLink>
+
+        {/* SALES */}
+        <GroupToggle id="sales" icon={<Icon.Cart size={17} />} label="Sales" />
+        {open.sales && (
+          <div className="sidebar-group-children">
+            <NavLink to="/items" icon={<Icon.Box size={16} />}>Items</NavLink>
+            <NavLink to="/sales-orders" icon={<Icon.FileText size={16} />}>Orders</NavLink>
+            <NavLink to="/deliveries" icon={<Icon.Truck size={16} />}>Deliveries</NavLink>
+            {isAdmin && (
+              <NavLink to="/invoices" icon={<Icon.FileText size={16} />}>Invoices</NavLink>
+            )}
+            <NavLink to="/payments" icon={<Icon.Wallet size={16} />}>Payments</NavLink>
           </div>
+        )}
 
-          {open.admin && (
-            <div style={{ marginLeft: "5px" }}>
-              <Link to="/users" style={linkStyle("/users")}>
-                Users
-              </Link>
+        {/* REPORTS */}
+        {isAnalyst && (
+          <NavLink to="/reports" icon={<Icon.BarChart size={17} />}>Reports</NavLink>
+        )}
+
+        {/* MASTERS */}
+        {isAdmin && (
+          <>
+            <GroupToggle id="masters" icon={<Icon.Layers size={17} />} label="Masters" />
+            {open.masters && (
+              <div className="sidebar-group-children">
+                <NavLink to="/price-lists" icon={<Icon.CreditCard size={16} />}>Price Lists</NavLink>
+                <NavLink to="/taxes" icon={<Icon.FileText size={16} />}>Taxes</NavLink>
+                <NavLink to="/currency" icon={<Icon.Wallet size={16} />}>Currency</NavLink>
+                <NavLink to="/payment-terms" icon={<Icon.FileText size={16} />}>Payment Terms</NavLink>
+                <NavLink to="/warehouses" icon={<Icon.Box size={16} />}>Warehouses</NavLink>
+                <NavLink to="/countries" icon={<Icon.MapPin size={16} />}>Countries</NavLink>
+                <NavLink to="/regions" icon={<Icon.MapPin size={16} />}>Regions</NavLink>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TRIPS AND ROUTES */}
+        <GroupToggle id="tripsRoutes" icon={<Icon.Route size={17} />} label="Trips and Routes" />
+        {open.tripsRoutes && (
+          <div className="sidebar-group-children">
+            <NavLink to="/trips" icon={<Icon.Truck size={16} />}>Trips</NavLink>
+            <NavLink to="/routes" icon={<Icon.Route size={16} />}>Routes</NavLink>
+          </div>
+        )}
+
+        {/* TRACKING */}
+        <GroupToggle id="ops" icon={<Icon.MapPin size={17} />} label="Tracking" />
+        {open.ops && (
+          <div className="sidebar-group-children">
+            <NavLink to="/visits" icon={<Icon.MapPin size={16} />}>Visits</NavLink>
+            <NavLink to="/timesheet" icon={<Icon.Clock size={16} />}>Timesheet</NavLink>
+          </div>
+        )}
+
+        {/* IAM */}
+        {isAdmin && (
+          <>
+            <GroupToggle id="iam" icon={<Icon.Shield size={17} />} label="IAM" />
+            {open.iam && (
+              <div className="sidebar-group-children">
+                <NavLink to="/users" icon={<Icon.Users size={16} />}>Users</NavLink>
+              </div>
+            )}
+          </>
+        )}
+
+        <NavLink to="#" icon={<Icon.Bell size={17} />}>Notifications</NavLink>
+
+        {/* OTHER */}
+        {!collapsed && <div className="sidebar-section-label">Other</div>}
+        <GroupToggle id="other" icon={<Icon.Settings size={17} />} label="Settings" />
+        {open.other && (
+          <div className="sidebar-group-children">
+            <NavLink to="/settings" icon={<Icon.Settings size={16} />}>General Settings</NavLink>
+            {role === "developer" && (
+              <NavLink to="/logs" icon={<Icon.FileText size={16} />}>System Logs</NavLink>
+            )}
+          </div>
+        )}
+        <NavLink to="/help" icon={<Icon.HelpCircle size={17} />}>Help Center</NavLink>
+
+        {/* FOOTER */}
+        <div className="sidebar-footer">
+          <div className="avatar-circle">{username.charAt(0).toUpperCase()}</div>
+          {!collapsed && (
+            <div className="sidebar-footer-text">
+              <div className="name">{username}</div>
+              <div className="email">{role}</div>
             </div>
           )}
-        </>
-      )}
+        </div>
 
-      {/* ANALYTICS */}
-      {["admin", "developer", "supervisor"].includes(role) && (
-        <>
-          <div onClick={() => toggle("analytics")} style={sectionTitle}>
-            ANALYTICS
-          </div>
-
-          {open.analytics && (
-            <div style={{ marginLeft: "5px" }}>
-              <Link to="/reports" style={linkStyle("/reports")}>
-                Reports
-              </Link>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* SYSTEM LOGS */}
-      {role === "developer" && (
-        <>
-          <div style={sectionTitle}>
-            DEVELOPER
-          </div>
-
-          <Link to="/logs" style={linkStyle("/logs")}>
-            System Logs
-          </Link>
-        </>
-      )}
+      </div>
     </div>
   );
 }

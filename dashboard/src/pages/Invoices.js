@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axiosConfig";
+import { Icon } from "../components/Icons";
+import {
+  PageHeader,
+  FilterBar,
+  StatusPill,
+  SortableTh,
+  TableFooter,
+  EmptyState,
+  useTableControls,
+} from "../components/ui";
 
 function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -41,12 +51,23 @@ function Invoices() {
   };
 
   // ================= FETCH SALES ORDERS =================
+  // Was calling "/sales-orders" here, which doesn't match the endpoint
+  // that actually works elsewhere in the app ("/admin/sales-orders" — see
+  // SalesOrders.js, which successfully lists orders). That mismatch is
+  // why this dropdown came back empty. Fixed to match.
+  const [soLookupError, setSoLookupError] = useState("");
+
   const fetchSalesOrders = async () => {
+    setSoLookupError("");
     try {
-      const res = await api.get("/sales-orders");
-      setSalesOrders(res.data || []);
+      const res = await api.get("/admin/sales-orders");
+      // Only approved orders can be invoiced.
+      setSalesOrders((res.data || []).filter((o) => !o.status || o.status === "Approved"));
     } catch (error) {
       console.error("FETCH SALES ORDERS ERROR:", error.response?.data || error.message);
+      setSoLookupError(
+        "Could not load sales orders (" + (error.response?.status || "no response") + ")."
+      );
     }
   };
 
@@ -81,18 +102,22 @@ function Invoices() {
   };
 
   // ================= SAVE =================
+  const [saveError, setSaveError] = useState("");
+
   const handleSave = async () => {
+    setSaveError("");
     try {
-      if (
-        !formData.invoice_number ||
-        !formData.sales_order_id ||
-        !formData.due_date
-      ) {
-        showMessage("Invoice Number, Sales Order and Due Date are required");
+      if (!formData.sales_order_id || !formData.due_date) {
+        showMessage("Sales Order and Due Date are required");
         return;
       }
 
       const payload = {
+        // Your backend doesn't auto-generate invoice numbers yet (a
+        // create attempt without this field returned 400), so we send a
+        // client-generated suggestion. Once the backend adds real
+        // server-side auto-numbering (API_CONTRACTS.md item 1), this
+        // field can go back to being fully server-assigned.
         invoice_number: formData.invoice_number,
         customer_name: formData.customer_name,
         sales_order_id: Number(formData.sales_order_id),
@@ -109,7 +134,14 @@ function Invoices() {
 
     } catch (error) {
       console.error("SAVE ERROR:", error.response?.data || error.message);
-      showMessage("Failed to create invoice");
+      // Show the backend's actual validation message instead of a
+      // generic one, so it's obvious what field it's rejecting.
+      setSaveError(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        JSON.stringify(error.response?.data) ||
+        "Failed to create invoice"
+      );
     }
   };
 
@@ -127,82 +159,93 @@ function Invoices() {
     setShowForm(false);
   };
 
-  // ================= STATUS BADGE =================
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "Paid":
-        return <span className="badge bg-success">Paid</span>;
-
-      case "Pending":
-        return <span className="badge bg-warning text-dark">Pending</span>;
-
-      default:
-        return <span className="badge bg-secondary">{status}</span>;
-    }
-  };
-
   // ================= UI =================
+  const tc = useTableControls(invoices, {
+    searchKeys: ["invoice_number", "customer_name", "status"],
+  });
+
   return (
     <div>
 
-      {/* HEADER */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3>Invoices</h3>
+      <PageHeader
+        title="Invoices"
+        subtitle="Invoices are created against an approved sales order. Invoice numbers are assigned automatically."
+        actions={
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setFormData((f) => ({
+                ...f,
+                invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+              }));
+              setShowForm(true);
+            }}
+          >
+            <Icon.Plus size={14} /> Create Invoice
+          </button>
+        }
+      />
 
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowForm(true)}
-        >
-          + Create Invoice
-        </button>
-      </div>
+      {message && <div className="alert alert-info">{message}</div>}
 
-      {/* MESSAGE */}
-      {message && (
-        <div className="alert alert-info">
-          {message}
-        </div>
-      )}
+      <FilterBar
+        searchValue={tc.search}
+        onSearchChange={tc.setSearch}
+        placeholder="Search invoice #, customer, status..."
+        onAddFilter={() => showMessage("Custom filters coming soon")}
+        onRefresh={fetchInvoices}
+      />
 
       {/* TABLE */}
-      <div className="card shadow-sm p-3">
+      <div className="card p-0">
+        <div className="table-wrap">
+          {loading ? (
+            <p className="p-4 mb-0">Loading invoices...</p>
+          ) : (
+            <table className="table table-hover align-middle">
 
-        {loading ? (
-          <p>Loading invoices...</p>
-        ) : invoices.length === 0 ? (
-          <p className="text-muted">No invoices found.</p>
-        ) : (
-          <table className="table table-hover align-middle">
-
-            <thead className="table-dark">
-              <tr>
-                <th>ID</th>
-                <th>Invoice #</th>
-                <th>Customer</th>
-                <th>Amount</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td>{inv.id}</td>
-                  <td>{inv.invoice_number}</td>
-                  <td>{inv.customer_name}</td>
-                  <td>{inv.invoice_amount}</td>
-                  <td>{inv.due_date}</td>
-                  <td>{getStatusBadge(inv.status)}</td>
-                  <td>{inv.created_at}</td>
+              <thead>
+                <tr>
+                  <SortableTh label="Invoice #" sortKey="invoice_number" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <SortableTh label="Customer" sortKey="customer_name" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <SortableTh label="Amount" sortKey="invoice_amount" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <SortableTh label="Due Date" sortKey="due_date" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
+                  <th>Status</th>
+                  <th>Created</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
 
-          </table>
-        )}
+              <tbody>
+                {tc.pageRows.length === 0 ? (
+                  <tr><td colSpan="6"><EmptyState label="No invoices found." /></td></tr>
+                ) : (
+                  tc.pageRows.map((inv) => (
+                    <tr key={inv.id}>
+                      <td className="fw-semibold">{inv.invoice_number}</td>
+                      <td>{inv.customer_name}</td>
+                      <td>{Number(inv.invoice_amount || 0).toLocaleString()}</td>
+                      <td>{inv.due_date}</td>
+                      <td><StatusPill status={inv.status} /></td>
+                      <td>{inv.created_at}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
 
+            </table>
+          )}
+        </div>
+
+        <div className="px-3 pb-2">
+          <TableFooter
+            rowsPerPage={tc.rowsPerPage}
+            onRowsPerPageChange={tc.setRowsPerPage}
+            totalRows={tc.totalRows}
+            page={tc.page}
+            totalPages={tc.totalPages}
+            onPageChange={tc.setPage}
+          />
+        </div>
       </div>
 
       {/* FORM */}
@@ -210,14 +253,20 @@ function Invoices() {
         <div className="card p-4 mt-4">
           <h5>Create Invoice</h5>
 
+          {saveError && <div className="alert alert-danger py-2">{saveError}</div>}
+
+          <label>Invoice Number</label>
           <input
             name="invoice_number"
             className="form-control mb-2"
-            placeholder="Invoice Number"
+            placeholder="e.g. INV-0001"
             value={formData.invoice_number}
             onChange={handleChange}
+            title="Suggested automatically — edit if your backend expects a different format"
           />
 
+          <label>Sales Order</label>
+          {soLookupError && <div className="alert alert-danger py-2">{soLookupError}</div>}
           <select
             name="sales_order_id"
             className="form-control mb-2"
@@ -235,6 +284,12 @@ function Invoices() {
               </option>
             ))}
           </select>
+          {!soLookupError && salesOrders.length === 0 && (
+            <div className="alert alert-warning py-2">
+              No approved sales orders found. If you already created some, confirm they're
+              marked "Approved" on the Sales Orders page.
+            </div>
+          )}
 
           <input
             name="customer_name"
