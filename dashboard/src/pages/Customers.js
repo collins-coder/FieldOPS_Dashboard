@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axiosConfig";
 import { MASTERS_BASE } from "../api/mastersBase";
 import { Icon } from "../components/Icons";
@@ -14,6 +15,7 @@ import {
 } from "../components/ui";
 
 export default function Customers() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +27,6 @@ export default function Customers() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [viewing, setViewing] = useState(null);
 
   const [message, setMessage] = useState("");
 
@@ -131,7 +132,6 @@ export default function Customers() {
   // ================= EDIT =================
   const handleEdit = (c) => {
     setEditing(c);
-    setViewing(null);
     setShowForm(true);
 
     setFormData({
@@ -149,9 +149,11 @@ export default function Customers() {
   };
 
   // ================= VIEW =================
+  // Opens the customer's own dedicated page (with its full sales
+  // order / invoice / payment history) instead of an inline card
+  // squeezed below the table.
   const handleView = (c) => {
-    setViewing(c);
-    setShowForm(false);
+    navigate(`/customers/${c.id}`);
   };
 
   // ================= DELETE =================
@@ -185,7 +187,6 @@ export default function Customers() {
 
     setEditing(null);
     setShowForm(false);
-    setViewing(null);
   };
 
   // ================= UI =================
@@ -205,7 +206,6 @@ export default function Customers() {
             onClick={() => {
               setShowForm(true);
               setEditing(null);
-              setViewing(null);
 
               setFormData({
                 customer_code: `CUST-${Date.now().toString().slice(-6)}`,
@@ -316,25 +316,6 @@ export default function Customers() {
           />
         </div>
       </div>
-
-      {/* VIEW */}
-      {viewing && (
-        <div className="card p-3 mt-3">
-          <h5>Customer Details</h5>
-          <p><b>Name:</b> {viewing.customer_name}</p>
-          <p><b>Email:</b> {viewing.email}</p>
-          <p><b>Phone:</b> {viewing.phone}</p>
-          <p><b>Location:</b> {viewing.location}</p>
-          <p><b>Route:</b> {viewing.route}</p>
-          <p><b>Credit:</b> {viewing.credit_limit}</p>
-          <p><b>Price List:</b> {viewing.price_list_name || "—"}</p>
-          <p><b>Payment Terms:</b> {viewing.payment_terms_name || "—"}</p>
-
-          <button className="btn btn-secondary btn-sm" onClick={() => setViewing(null)}>
-            Close
-          </button>
-        </div>
-      )}
 
       {/* FORM */}
       {showForm && (

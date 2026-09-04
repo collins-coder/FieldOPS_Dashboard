@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axiosConfig";
 import { Icon } from "../components/Icons";
 import {
@@ -8,52 +9,49 @@ import {
   SortableTh,
   TableFooter,
   EmptyState,
+  ExportButton,
   useTableControls,
 } from "../components/ui";
 
 /* ============================================================
-   PAY-ON-ACCOUNT NOTE (see API_CONTRACTS.md item 6):
-   When "Pay Against" = Customer, this sends { customer_id, ... } and NO
-   invoice_id. That only works once the backend accepts payments with no
-   invoice (an "on account" payment) and exposes a reconcile endpoint to
-   apply it to an invoice later — exactly like SAP B1's Incoming Payment
-   screen. If your backend doesn't support that yet, this half of the
-   form will 400/422 until it's added — the error will show inline below
-   the form so it's obvious what's missing.
+   SAP B1's "Incoming Payment": pick an open invoice, pay some or
+   all of its remaining balance. The backend (create_payment):
+     - generates the payment_reference itself from the new row's id
+       (PAY-000123) — never sent by this form
+     - rejects an amount over the invoice's remaining balance (400)
+     - recomputes the invoice's Pending/Partial/Paid status after
+   "Pay on account" (a customer with no invoice yet) is NOT
+   supported by the backend yet — it needs a schema change
+   (payments.customer_id + nullable invoice_id) that hasn't been
+   run. Rather than show a form half that always 400s, that path is
+   removed until the schema catches up.
    ============================================================ */
 
 function Payments() {
+  const navigate = useNavigate();
   const [payments, setPayments] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [customers, setCustomers] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
   const [showForm, setShowForm] = useState(false);
-
-  // "invoice" (pay a specific invoice) or "customer" (pay on account,
-  // no invoice yet — reconciled later)
-  const [payAgainst, setPayAgainst] = useState("invoice");
+  const [invoiceDetail, setInvoiceDetail] = useState(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   const [formData, setFormData] = useState({
-    payment_reference: "",
     invoice_id: "",
-    customer_id: "",
     amount_paid: "",
     payment_method: "",
     payment_date: "",
-    status: "Pending",
   });
 
-  // ================= MESSAGE =================
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 3000);
   };
 
-  // ================= FETCH =================
   const fetchPayments = async () => {
     setLoading(true);
     try {
@@ -67,121 +65,89 @@ function Payments() {
     }
   };
 
-  const fetchLookups = async () => {
-    const [invRes, custRes] = await Promise.allSettled([
-      api.get("/admin/invoices"),
-      api.get("/customers"),
-    ]);
-
-    setInvoices(invRes.status === "fulfilled" ? invRes.value.data || [] : []);
-    setCustomers(custRes.status === "fulfilled" ? custRes.value.data || [] : []);
+  // Only invoices that still owe something can be paid against.
+  const fetchInvoices = async () => {
+    try {
+      const res = await api.get("/admin/invoices");
+      setInvoices((res.data || []).filter((inv) => inv.status !== "Paid" && inv.status !== "Cancelled"));
+    } catch (error) {
+      console.error("FETCH INVOICES ERROR:", error.response?.data || error.message);
+    }
   };
 
   useEffect(() => {
     fetchPayments();
-    fetchLookups();
+    fetchInvoices();
   }, []);
 
-  // ================= INPUT =================
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleInvoiceSelect = async (invoiceId) => {
+    setFormData((f) => ({ ...f, invoice_id: invoiceId, amount_paid: "" }));
+    setInvoiceDetail(null);
 
-    if (name === "invoice_id") {
-      const selectedInvoice = invoices.find((inv) => String(inv.id) === value);
-      setFormData({
-        ...formData,
-        invoice_id: value,
-        amount_paid: selectedInvoice ? selectedInvoice.invoice_amount : "",
-      });
-      return;
+    if (!invoiceId) return;
+
+    setLoadingBalance(true);
+    try {
+      const res = await api.get(`/admin/invoices/${invoiceId}`);
+      setInvoiceDetail(res.data);
+      // Pre-fill with the full remaining balance — the common case
+      // is paying it off in one go; user can lower it for a partial.
+      setFormData((f) => ({ ...f, amount_paid: res.data.balance_remaining || "" }));
+    } catch (err) {
+      console.error("FETCH INVOICE BALANCE ERROR:", err.response?.data || err.message);
+    } finally {
+      setLoadingBalance(false);
     }
-
-    setFormData({ ...formData, [name]: value });
   };
 
-  const switchPayAgainst = (mode) => {
-    setPayAgainst(mode);
-    setFormData({
-      ...formData,
-      invoice_id: "",
-      customer_id: "",
-      amount_paid: mode === "customer" ? formData.amount_paid : "",
-    });
-  };
-
-  // ================= SAVE =================
   const handleSave = async () => {
     setSaveError("");
 
-    if (payAgainst === "invoice" && !formData.invoice_id) {
-      showMessage("Please select an invoice, or switch to 'Pay on account'");
+    if (!formData.invoice_id) {
+      showMessage("Please select an invoice");
       return;
     }
-    if (payAgainst === "customer" && !formData.customer_id) {
-      showMessage("Please select a customer for this on-account payment");
-      return;
-    }
-    if (!formData.payment_reference || !formData.payment_method || !formData.payment_date || !formData.amount_paid) {
+    if (!formData.payment_method || !formData.payment_date || !formData.amount_paid) {
       showMessage("Please fill all required fields");
       return;
     }
 
     try {
-      const payload = {
-        payment_reference: formData.payment_reference,
-        amount_paid: Number(formData.amount_paid || 0),
+      const res = await api.post("/create-payment", {
+        invoice_id: Number(formData.invoice_id),
+        amount_paid: Number(formData.amount_paid),
         payment_method: formData.payment_method,
         payment_date: formData.payment_date,
-        status: "Completed",
-        ...(payAgainst === "invoice"
-          ? { invoice_id: Number(formData.invoice_id) }
-          : { customer_id: Number(formData.customer_id), allocation_status: "unallocated" }),
-      };
+      });
 
-      await api.post("/create-payment", payload);
-
-      showMessage("Payment created successfully");
+      showMessage(
+        `Payment ${res.data.payment_reference} recorded — invoice is now ${res.data.invoice_status}.`
+      );
       resetForm();
       fetchPayments();
+      fetchInvoices();
     } catch (error) {
       console.error("SAVE PAYMENT ERROR:", error.response?.data || error.message);
-      if (payAgainst === "customer" && (error.response?.status === 400 || error.response?.status === 422)) {
-        setSaveError(
-          "The backend rejected this on-account payment (no invoice attached). It likely doesn't support pay-on-account yet — see API_CONTRACTS.md item 6 for what needs adding server-side."
-        );
-      } else {
-        setSaveError(error.response?.data?.message || "Failed to save payment.");
-      }
+      setSaveError(error.response?.data?.message || "Failed to save payment.");
     }
   };
 
-  // ================= RESET =================
   const resetForm = () => {
-    setFormData({
-      payment_reference: "",
-      invoice_id: "",
-      customer_id: "",
-      amount_paid: "",
-      payment_method: "",
-      payment_date: "",
-      status: "Pending",
-    });
-    setPayAgainst("invoice");
+    setFormData({ invoice_id: "", amount_paid: "", payment_method: "", payment_date: "" });
+    setInvoiceDetail(null);
     setSaveError("");
     setShowForm(false);
   };
 
-  // ================= UI =================
   const tc = useTableControls(payments, {
     searchKeys: ["payment_reference", "payment_method", "status"],
   });
 
   return (
     <div>
-
       <PageHeader
         title="Payments"
-        subtitle="Record a payment against an invoice, or pay on account and reconcile later."
+        subtitle="Record an incoming payment against an open invoice. References are assigned automatically."
         actions={
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>
             <Icon.Plus size={14} /> Add Payment
@@ -197,6 +163,7 @@ function Payments() {
         placeholder="Search reference, method, status..."
         onAddFilter={() => showMessage("Custom filters coming soon")}
         onRefresh={fetchPayments}
+        right={<ExportButton api={api} url="/admin/payments/export" filename="payments.xlsx" />}
       />
 
       {/* TABLE */}
@@ -206,41 +173,43 @@ function Payments() {
             <p className="p-4 mb-0">Loading payments...</p>
           ) : (
             <table className="table table-hover align-middle">
-
               <thead>
                 <tr>
                   <SortableTh label="Reference" sortKey="payment_reference" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
-                  <th>Invoice / Customer</th>
+                  <th>Invoice</th>
                   <SortableTh label="Amount" sortKey="amount_paid" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
                   <th>Method</th>
                   <SortableTh label="Date" sortKey="payment_date" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
                 {tc.pageRows.length === 0 ? (
-                  <tr><td colSpan="6"><EmptyState label="No payments found." /></td></tr>
+                  <tr><td colSpan="7"><EmptyState label="No payments found." /></td></tr>
                 ) : (
                   tc.pageRows.map((p) => (
                     <tr key={p.id}>
-                      <td className="fw-semibold">{p.payment_reference}</td>
-                      <td>
-                        {p.invoice_id ? (
-                          `Invoice #${p.invoice_id}`
-                        ) : (
-                          <span className="pill pill-info">On Account{p.customer_name ? ` — ${p.customer_name}` : ""}</span>
-                        )}
+                      <td className="fw-semibold">
+                        <span className="table-link" onClick={() => navigate(`/payments/${p.id}`)}>
+                          {p.payment_reference}
+                        </span>
                       </td>
+                      <td>{p.invoice_number || `#${p.invoice_id}`}</td>
                       <td>{Number(p.amount_paid || 0).toLocaleString()}</td>
                       <td>{p.payment_method}</td>
                       <td>{p.payment_date}</td>
                       <td><StatusPill status={p.status} /></td>
+                      <td>
+                        <button className="btn btn-sm btn-outline-primary" onClick={() => navigate(`/payments/${p.id}`)}>
+                          View
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
-
             </table>
           )}
         </div>
@@ -264,106 +233,55 @@ function Payments() {
 
           {saveError && <div className="alert alert-danger py-2">{saveError}</div>}
 
-          <input
-            name="payment_reference"
+          <label>Invoice</label>
+          <select
             className="form-control mb-2"
-            placeholder="Payment Reference"
-            value={formData.payment_reference}
-            onChange={handleChange}
+            value={formData.invoice_id}
+            onChange={(e) => handleInvoiceSelect(e.target.value)}
+          >
+            <option value="">Select Invoice</option>
+            {invoices.map((inv) => (
+              <option key={inv.id} value={inv.id}>
+                {inv.invoice_number} - {inv.customer_name} ({inv.status})
+              </option>
+            ))}
+          </select>
+          {invoices.length === 0 && (
+            <div className="alert alert-warning py-2">
+              No open invoices found — every invoice is either fully paid or cancelled.
+            </div>
+          )}
+
+          {loadingBalance && <p className="text-muted" style={{ fontSize: 13 }}>Loading balance...</p>}
+
+          {invoiceDetail && (
+            <div className="alert alert-info py-2" style={{ fontSize: 13 }}>
+              Invoice total: <b>{Number(invoiceDetail.invoice_amount || 0).toLocaleString()}</b> —
+              already paid: <b>{invoiceDetail.total_paid.toLocaleString()}</b> —
+              remaining balance: <b>{invoiceDetail.balance_remaining.toLocaleString()}</b>
+            </div>
+          )}
+
+          <label>Amount Paid</label>
+          <input
+            type="number"
+            className="form-control mb-2"
+            placeholder="Amount Paid"
+            value={formData.amount_paid}
+            max={invoiceDetail?.balance_remaining}
+            onChange={(e) => setFormData((f) => ({ ...f, amount_paid: e.target.value }))}
           />
-
-          <label className="form-label mb-1">Pay Against</label>
-          <div className="btn-group w-100 mb-2" role="group">
-            <button
-              type="button"
-              className={`btn ${payAgainst === "invoice" ? "btn-primary" : "btn-light"}`}
-              onClick={() => switchPayAgainst("invoice")}
-            >
-              Invoice / Order
-            </button>
-            <button
-              type="button"
-              className={`btn ${payAgainst === "customer" ? "btn-primary" : "btn-light"}`}
-              onClick={() => switchPayAgainst("customer")}
-            >
-              Customer (Pay on Account)
-            </button>
-          </div>
-
-          {payAgainst === "invoice" ? (
-            <>
-              <select
-                name="invoice_id"
-                className="form-control mb-2"
-                value={formData.invoice_id}
-                onChange={handleChange}
-              >
-                <option value="">Select Invoice</option>
-                {invoices.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.invoice_number} - {inv.customer_name}
-                  </option>
-                ))}
-              </select>
-              {invoices.length === 0 && (
-                <div className="alert alert-warning py-2">
-                  No invoices found — create one first, or switch to "Pay on account"
-                  if the customer is paying before an invoice exists.
-                </div>
-              )}
-
-              <input
-                name="amount_paid"
-                className="form-control mb-2"
-                placeholder="Amount Paid"
-                value={formData.amount_paid}
-                readOnly
-              />
-            </>
-          ) : (
-            <>
-              <select
-                name="customer_id"
-                className="form-control mb-2"
-                value={formData.customer_id}
-                onChange={handleChange}
-              >
-                <option value="">Select Customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.customer_name} {c.customer_code ? `(${c.customer_code})` : ""}
-                  </option>
-                ))}
-              </select>
-              {customers.length === 0 && (
-                <div className="alert alert-warning py-2">
-                  No customers found — check the Customers page loaded correctly.
-                </div>
-              )}
-
-              <input
-                name="amount_paid"
-                type="number"
-                className="form-control mb-2"
-                placeholder="Amount Paid"
-                value={formData.amount_paid}
-                onChange={handleChange}
-              />
-
-              <div className="alert alert-info py-2">
-                This payment will be recorded as <strong>unallocated / on account</strong>.
-                Once an order or invoice exists for this customer, it can be reconciled
-                against it (SAP B1-style) — that reconciliation screen is planned for
-                the next phase.
-              </div>
-            </>
+          {invoiceDetail && (
+            <p className="text-muted mb-2" style={{ fontSize: 12 }}>
+              Enter less than the full balance to record a partial payment — the invoice
+              will show as "Partial" until it's fully settled.
+            </p>
           )}
 
           <select
-            name="payment_method"
             className="form-control mb-2"
             value={formData.payment_method}
-            onChange={handleChange}
+            onChange={(e) => setFormData((f) => ({ ...f, payment_method: e.target.value }))}
           >
             <option value="">Select Payment Method</option>
             <option value="Cash">Cash</option>
@@ -374,22 +292,19 @@ function Payments() {
 
           <input
             type="date"
-            name="payment_date"
             className="form-control mb-3"
             value={formData.payment_date}
-            onChange={handleChange}
+            onChange={(e) => setFormData((f) => ({ ...f, payment_date: e.target.value }))}
           />
 
           <button className="btn btn-success me-2" onClick={handleSave}>
             Save
           </button>
-
           <button className="btn btn-secondary" onClick={resetForm}>
             Cancel
           </button>
         </div>
       )}
-
     </div>
   );
 }

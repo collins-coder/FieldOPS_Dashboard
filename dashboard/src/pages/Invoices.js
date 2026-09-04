@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "../api/axiosConfig";
 import { Icon } from "../components/Icons";
 import {
@@ -8,10 +9,14 @@ import {
   SortableTh,
   TableFooter,
   EmptyState,
+  ExportButton,
   useTableControls,
 } from "../components/ui";
 
 function Invoices() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [invoices, setInvoices] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
 
@@ -19,6 +24,8 @@ function Invoices() {
   const [message, setMessage] = useState("");
 
   const [showForm, setShowForm] = useState(false);
+  const [soLookupError, setSoLookupError] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const [formData, setFormData] = useState({
     invoice_number: "",
@@ -26,19 +33,16 @@ function Invoices() {
     sales_order_id: "",
     invoice_amount: "",
     due_date: "",
-    status: "Pending"
+    status: "Pending",
   });
 
-  // ================= MESSAGE =================
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 3000);
   };
 
-  // ================= FETCH INVOICES =================
   const fetchInvoices = async () => {
     setLoading(true);
-
     try {
       const res = await api.get("/admin/invoices");
       setInvoices(res.data || []);
@@ -50,24 +54,21 @@ function Invoices() {
     }
   };
 
-  // ================= FETCH SALES ORDERS =================
-  // Was calling "/sales-orders" here, which doesn't match the endpoint
-  // that actually works elsewhere in the app ("/admin/sales-orders" — see
-  // SalesOrders.js, which successfully lists orders). That mismatch is
-  // why this dropdown came back empty. Fixed to match.
-  const [soLookupError, setSoLookupError] = useState("");
-
+  // Only Approved AND still-Open orders can be invoiced — an order
+  // that's already Closed (already invoiced or delivered) shouldn't
+  // show up here to invoice again.
   const fetchSalesOrders = async () => {
     setSoLookupError("");
     try {
       const res = await api.get("/admin/sales-orders");
-      // Only approved orders can be invoiced.
-      setSalesOrders((res.data || []).filter((o) => !o.status || o.status === "Approved"));
+      setSalesOrders(
+        (res.data || []).filter(
+          (o) => (!o.status || o.status === "Approved") && (o.doc_status || "Open") === "Open"
+        )
+      );
     } catch (error) {
       console.error("FETCH SALES ORDERS ERROR:", error.response?.data || error.message);
-      setSoLookupError(
-        "Could not load sales orders (" + (error.response?.status || "no response") + ")."
-      );
+      setSoLookupError("Could not load sales orders (" + (error.response?.status || "no response") + ").");
     }
   };
 
@@ -76,33 +77,41 @@ function Invoices() {
     fetchSalesOrders();
   }, []);
 
-  // ================= INPUT =================
+  // Arrived here via "Copy to Invoice" from a Sales Order detail page.
+  useEffect(() => {
+    const source = location.state?.copyFromOrder;
+    if (source) {
+      setFormData({
+        invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+        customer_name: source.customer_name || "",
+        sales_order_id: String(source.id),
+        invoice_amount: source.total_amount || "",
+        due_date: "",
+        status: "Pending",
+      });
+      setShowForm(true);
+      // Clear the router state so refreshing the page doesn't reopen this.
+      window.history.replaceState({}, document.title);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     if (name === "sales_order_id") {
-      const selectedOrder = salesOrders.find(
-        (order) => String(order.id) === value
-      );
-
+      const selectedOrder = salesOrders.find((order) => String(order.id) === value);
       setFormData({
         ...formData,
         sales_order_id: value,
         customer_name: selectedOrder ? selectedOrder.customer_name : "",
-        invoice_amount: selectedOrder ? selectedOrder.total_amount : ""
+        invoice_amount: selectedOrder ? selectedOrder.total_amount : "",
       });
-
       return;
     }
 
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData({ ...formData, [name]: value });
   };
-
-  // ================= SAVE =================
-  const [saveError, setSaveError] = useState("");
 
   const handleSave = async () => {
     setSaveError("");
@@ -113,17 +122,12 @@ function Invoices() {
       }
 
       const payload = {
-        // Your backend doesn't auto-generate invoice numbers yet (a
-        // create attempt without this field returned 400), so we send a
-        // client-generated suggestion. Once the backend adds real
-        // server-side auto-numbering (API_CONTRACTS.md item 1), this
-        // field can go back to being fully server-assigned.
         invoice_number: formData.invoice_number,
         customer_name: formData.customer_name,
         sales_order_id: Number(formData.sales_order_id),
         invoice_amount: Number(formData.invoice_amount || 0),
         due_date: formData.due_date,
-        status: "Pending"
+        status: "Pending",
       };
 
       await api.post("/create-invoice", payload);
@@ -131,21 +135,17 @@ function Invoices() {
       showMessage("Invoice created successfully");
       resetForm();
       fetchInvoices();
-
+      fetchSalesOrders();
     } catch (error) {
       console.error("SAVE ERROR:", error.response?.data || error.message);
-      // Show the backend's actual validation message instead of a
-      // generic one, so it's obvious what field it's rejecting.
       setSaveError(
         error.response?.data?.message ||
         error.response?.data?.error ||
-        JSON.stringify(error.response?.data) ||
         "Failed to create invoice"
       );
     }
   };
 
-  // ================= RESET =================
   const resetForm = () => {
     setFormData({
       invoice_number: "",
@@ -153,31 +153,26 @@ function Invoices() {
       sales_order_id: "",
       invoice_amount: "",
       due_date: "",
-      status: "Pending"
+      status: "Pending",
     });
-
+    setSaveError("");
     setShowForm(false);
   };
 
-  // ================= UI =================
   const tc = useTableControls(invoices, {
     searchKeys: ["invoice_number", "customer_name", "status"],
   });
 
   return (
     <div>
-
       <PageHeader
         title="Invoices"
-        subtitle="Invoices are created against an approved sales order. Invoice numbers are assigned automatically."
+        subtitle="Invoices are created against an approved, still-Open sales order. Click a row to open the full document."
         actions={
           <button
             className="btn btn-primary"
             onClick={() => {
-              setFormData((f) => ({
-                ...f,
-                invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-              }));
+              setFormData((f) => ({ ...f, invoice_number: `INV-${Date.now().toString().slice(-6)}` }));
               setShowForm(true);
             }}
           >
@@ -194,44 +189,52 @@ function Invoices() {
         placeholder="Search invoice #, customer, status..."
         onAddFilter={() => showMessage("Custom filters coming soon")}
         onRefresh={fetchInvoices}
+        right={<ExportButton api={api} url="/admin/invoices/export" filename="invoices.xlsx" />}
       />
 
-      {/* TABLE */}
       <div className="card p-0">
         <div className="table-wrap">
           {loading ? (
             <p className="p-4 mb-0">Loading invoices...</p>
           ) : (
             <table className="table table-hover align-middle">
-
               <thead>
                 <tr>
                   <SortableTh label="Invoice #" sortKey="invoice_number" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
                   <SortableTh label="Customer" sortKey="customer_name" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
                   <SortableTh label="Amount" sortKey="invoice_amount" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
                   <SortableTh label="Due Date" sortKey="due_date" activeKey={tc.sortKey} dir={tc.sortDir} onSort={tc.toggleSort} />
-                  <th>Status</th>
-                  <th>Created</th>
+                  <th>Payment Status</th>
+                  <th>Document</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
                 {tc.pageRows.length === 0 ? (
-                  <tr><td colSpan="6"><EmptyState label="No invoices found." /></td></tr>
+                  <tr><td colSpan="7"><EmptyState label="No invoices found." /></td></tr>
                 ) : (
                   tc.pageRows.map((inv) => (
                     <tr key={inv.id}>
-                      <td className="fw-semibold">{inv.invoice_number}</td>
+                      <td className="fw-semibold">
+                        <span className="table-link" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                          {inv.invoice_number}
+                        </span>
+                      </td>
                       <td>{inv.customer_name}</td>
                       <td>{Number(inv.invoice_amount || 0).toLocaleString()}</td>
                       <td>{inv.due_date}</td>
                       <td><StatusPill status={inv.status} /></td>
-                      <td>{inv.created_at}</td>
+                      <td><StatusPill status={inv.doc_status || "Open"} /></td>
+                      <td>
+                        <button className="btn btn-sm btn-outline-primary" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                          View
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
-
             </table>
           )}
         </div>
@@ -248,7 +251,6 @@ function Invoices() {
         </div>
       </div>
 
-      {/* FORM */}
       {showForm && (
         <div className="card p-4 mt-4">
           <h5>Create Invoice</h5>
@@ -274,20 +276,16 @@ function Invoices() {
             onChange={handleChange}
           >
             <option value="">Select Sales Order</option>
-
             {salesOrders.map((order) => (
-              <option
-                key={order.id}
-                value={order.id}
-              >
+              <option key={order.id} value={order.id}>
                 {order.order_number} - {order.customer_name}
               </option>
             ))}
           </select>
           {!soLookupError && salesOrders.length === 0 && (
             <div className="alert alert-warning py-2">
-              No approved sales orders found. If you already created some, confirm they're
-              marked "Approved" on the Sales Orders page.
+              No approved, still-Open sales orders found. An order already invoiced or
+              delivered is Closed and can't be invoiced again.
             </div>
           )}
 
@@ -307,6 +305,7 @@ function Invoices() {
             readOnly
           />
 
+          <label>Due Date</label>
           <input
             type="date"
             name="due_date"
@@ -315,22 +314,14 @@ function Invoices() {
             onChange={handleChange}
           />
 
-          <button
-            className="btn btn-success me-2"
-            onClick={handleSave}
-          >
+          <button className="btn btn-success me-2" onClick={handleSave}>
             Save
           </button>
-
-          <button
-            className="btn btn-secondary"
-            onClick={resetForm}
-          >
+          <button className="btn btn-secondary" onClick={resetForm}>
             Cancel
           </button>
         </div>
       )}
-
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   SortableTh,
   TableFooter,
   EmptyState,
+  ExportButton,
   useTableControls,
 } from "../components/ui";
 
@@ -86,8 +87,8 @@ function Items() {
   // ================= SAVE =================
   const handleSave = async () => {
     try {
-      if (!formData.item_code || !formData.name) {
-        showMessage("Item Code and Name are required");
+      if (!formData.name) {
+        showMessage("Item Name is required");
         return;
       }
 
@@ -96,6 +97,12 @@ function Items() {
         price: Number(formData.price || 0),
         stock: Number(formData.stock || 0)
       };
+      // item_code is generated server-side from the new row's id
+      // (ITEM-000123) — never sent on create, so it can't collide
+      // between two reps working at once. Editing an existing item
+      // still shows its real code (read-only) since that one's
+      // already assigned and the backend won't let it be changed.
+      if (!editing) delete payload.item_code;
 
       if (editing) {
         await api.put(`/items/${editing.id}`, payload);
@@ -110,7 +117,11 @@ function Items() {
 
     } catch (err) {
       console.error("SAVE ERROR:", err.response?.data || err.message);
-      showMessage("Save failed");
+      showMessage(
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Save failed"
+      );
     }
   };
 
@@ -170,7 +181,7 @@ function Items() {
 
       <PageHeader
         title="Items Master"
-        subtitle={`${items.length} items in catalogue`}
+        subtitle={`${items.length} items in catalogue — item codes are assigned automatically.`}
         actions={
           <button
             className="btn btn-primary"
@@ -192,6 +203,7 @@ function Items() {
         placeholder="Search item code, name, category..."
         onAddFilter={() => showMessage("Custom filters coming soon")}
         onRefresh={fetchItems}
+        right={<ExportButton api={api} url="/items/export" filename="items.xlsx" />}
       />
 
       {/* TABLE */}
@@ -272,14 +284,18 @@ function Items() {
         <div className="card p-4 mt-4">
           <h5>{editing ? "Edit Item" : "Add Item"}</h5>
 
+          <label>Item Code</label>
           <input
             name="item_code"
             className="form-control mb-2"
-            placeholder="Item Code"
+            placeholder={editing ? "" : "Auto-generated on save"}
             value={formData.item_code}
             onChange={handleChange}
+            disabled={!editing}
+            title={!editing ? "Assigned automatically by the server to prevent duplicates" : ""}
           />
 
+          <label>Item Name</label>
           <input
             name="name"
             className="form-control mb-2"

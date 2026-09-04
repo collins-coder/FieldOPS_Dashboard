@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "./Icons";
 
 /* =========================================================
@@ -292,5 +293,82 @@ export function ExportButton({ api, url, filename, label = "Export" }) {
         </span>
       )}
     </>
+  );
+}
+
+/* =========================================================
+   DocStatusExplainer — SAP B1 draws a hard line between a
+   document's lifecycle (Open/Closed — has it been copied to
+   something else yet) and its own status (Pending/Approved/Paid
+   etc — progress on the document itself). Showing them side by
+   side with a one-line explanation is what stops "why does it say
+   Pending" confusion: Pending here means "no payment yet", not
+   "not approved" or "not real yet".
+   ========================================================= */
+export function DocStatusExplainer({ status, statusLabel = "Status", docStatus, explain }) {
+  return (
+    <div className="d-flex flex-wrap gap-4 align-items-start">
+      <div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
+          {statusLabel}
+        </div>
+        <StatusPill status={status} />
+      </div>
+      {docStatus && (
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>
+            Document
+          </div>
+          <StatusPill status={docStatus} />
+        </div>
+      )}
+      {explain && (
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", maxWidth: 360, paddingTop: 2 }}>
+          {explain}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   RelatedDocLink — one row in a document's "related documents"
+   trail (SAP B1's base-document / target-document chain).
+   ========================================================= */
+export function RelatedDocLink({ icon, label, number, sub, to, onClick }) {
+  const content = (
+    <div className="d-flex align-items-center justify-content-between" style={{ padding: "10px 2px", cursor: "pointer" }}>
+      <div className="d-flex align-items-center gap-2">
+        {icon}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}: {number}</div>
+          {sub && <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{sub}</div>}
+        </div>
+      </div>
+      <span className="table-link">View →</span>
+    </div>
+  );
+
+  if (to) {
+    return <Link to={to} style={{ textDecoration: "none", color: "inherit" }}>{content}</Link>;
+  }
+  return <div onClick={onClick}>{content}</div>;
+}
+
+/* =========================================================
+   DocSection — a bordered card block used to group parts of a
+   document detail page (header, line items, related docs, etc).
+   ========================================================= */
+export function DocSection({ title, actions, children }) {
+  return (
+    <div className="card p-4 mb-3">
+      {title && (
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 style={{ fontWeight: 700, margin: 0 }}>{title}</h5>
+          {actions}
+        </div>
+      )}
+      {children}
+    </div>
   );
 }

@@ -13,13 +13,18 @@ import { Icon } from "./components/Icons";
 /* DASHBOARD */
 import DashboardHome from "./pages/DashboardHome";
 import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 
 /* SALES */
 import Items from "./pages/Items";
 import SalesOrders from "./pages/SalesOrders";
+import SalesOrderDetail from "./pages/SalesOrderDetail";
 import Invoices from "./pages/Invoices";
+import InvoiceDetail from "./pages/InvoiceDetail";
 import Payments from "./pages/Payments";
+import PaymentDetail from "./pages/PaymentDetail";
 import Deliveries from "./pages/Deliveries";
+import DeliveryDetail from "./pages/DeliveryDetail";
 
 /* OPERATIONS */
 import Trips from "./pages/Trips";
@@ -168,18 +173,30 @@ function App() {
               {/* DASHBOARD */}
               <Route path="/" element={<DashboardHome />} />
               <Route path="/customers" element={<Customers />} />
+              <Route path="/customers/:id" element={<CustomerDetail />} />
 
               {/* SALES */}
               <Route path="/items" element={<Items />} />
               <Route path="/sales-orders" element={<SalesOrders />} />
+              <Route path="/sales-orders/:id" element={<SalesOrderDetail />} />
               <Route path="/deliveries" element={<Deliveries />} />
+              <Route path="/deliveries/:id" element={<DeliveryDetail />} />
               <Route path="/payments" element={<Payments />} />
+              <Route path="/payments/:id" element={<PaymentDetail />} />
 
               <Route
                 path="/invoices"
                 element={
                   <Protected allowed={["admin", "developer"]}>
                     <Invoices />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/invoices/:id"
+                element={
+                  <Protected allowed={["admin", "developer"]}>
+                    <InvoiceDetail />
                   </Protected>
                 }
               />
