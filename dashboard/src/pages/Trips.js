@@ -281,10 +281,15 @@ function Trips() {
         err.response?.data || err.message
       );
 
+      // Show the reason the server gave (e.g. "Choose the day of the week
+      // for this trip") instead of a message that says nothing.
+      const reason = err.response?.data?.message;
+
       alert(
-        editingTrip
+        (editingTrip
           ? "Failed to update trip"
-          : "Failed to create trip"
+          : "Failed to create trip") +
+          (reason ? `: ${reason}` : "")
       );
     }
   };
@@ -814,7 +819,18 @@ function Trips() {
                         {trip.region || trip.region_name}
                       </td>
 
-                      <td>{trip.schedule_type}</td>
+                      <td>
+                        {trip.schedule_summary ||
+                          trip.schedule_type}
+                        {/* A trip with no day set never shows on a rep's phone. */}
+                        {trip.schedule_summary?.endsWith(
+                          "no day set"
+                        ) && (
+                          <div className="small text-danger">
+                            Won't appear on the phone. Edit to set the day.
+                          </div>
+                        )}
+                      </td>
 
                       <td>{trip.created_at}</td>
 
